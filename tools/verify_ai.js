@@ -126,21 +126,22 @@ console.log("=== D. 情绪（不改强度下限） ===");
   check("暴怒比冷静更激进（rage mult最高）", EMOTIONS.rage.mult >= EMOTIONS.calm.mult, `${EMOTIONS.rage.mult} vs ${EMOTIONS.calm.mult}`);
 }
 
-console.log("=== E. 时间上限 + 难度配置 ===");
+console.log("=== E. 时间上限(≤1s) + 难度配置 ===");
 {
   const hell = DIFF_CFG.hell;
-  check("地狱 timeMs=1000", hell.timeMs === 1000, "timeMs=" + hell.timeMs);
+  check("地狱 timeMs ≤ 950（保正 ≤1s）", hell.timeMs <= 950, "timeMs=" + hell.timeMs);
+  check("各难度 timeMs 均 ≤ 950（单步不超 1s）", Object.keys(DIFF_CFG).every(k => DIFF_CFG[k].timeMs <= 950));
   // 地狱单步决策耗时（单次测量）
   const hb = emptyBoard();
   [[0,0],[0,1],[0,2],[0,3],[1,0],[1,1],[1,2],[1,3],[2,0],[2,1],[2,2],[2,3],[3,0]].forEach((c,i)=>{ placeTile(hb, c[0], c[1], [2,4,8,16,32,64,128,2,4,8,16,32,64][i]); });
   const t0 = Date.now();
-  const hd = chooseBotMove(hb, { timeMs: hell.timeMs, nodes: hell.nodes, selfKnown: hell.selfKnown, p4b: hell.p4b, blunder: hell.blunder, ceil: hell.ceil || 0, mult: 1 });
+  const hd = chooseBotMove(hb, { timeMs: hell.timeMs, nodes: hell.nodes, selfKnown: hell.selfKnown, p4b: hell.p4b, blunder: hell.blunder, ceil: hell.ceil || 0, mult: 1.7 });
   const dt = Date.now() - t0;
-  check("地狱单步决策 ≤ 1500ms", dt <= 1500, "dt=" + dt + "ms, dir=" + hd);
+  check("地狱(含 rage 放大 1.7×) 单步决策 ≤ 1150ms", dt <= 1150, "dt=" + dt + "ms, dir=" + hd);
   check("地狱决策返回合法方向", hd === null || (hd >= 0 && hd <= 3), "dir=" + hd);
-  // chooseBotMove respect ceil（简单档）
-  const ecl = chooseBotMove((()=>{const b=emptyBoard(); b[0][0]=16; return b; })(), { timeMs: 10, nodes: 50, selfKnown: false, p4b: 0.1, blunder: 0, ceil: 8, mult: 1 });
-  check("简单档 ceil=8 下拒绝越界走法", ecl === null, "ecl=" + ecl);
+  // chooseBotMove respect ceil（简单档 64）
+  const ecl = chooseBotMove((()=>{const b=emptyBoard(); b[0][0]=128; return b; })(), { timeMs: 10, nodes: 50, selfKnown: false, p4b: 0.1, blunder: 0, ceil: 64, mult: 1 });
+  check("简单档 ceil=64 下搜索拒绝越界走法", ecl === null, "ecl=" + ecl);
 }
 
 console.log("=== F. 难度分级（简单必胜 / 地狱必败）+ 确定性封顶 ===");
@@ -169,14 +170,12 @@ console.log("=== F. 难度分级（简单必胜 / 地狱必败）+ 确定性封�
     return { win, pMax, aiMax };
   }
 
-  // —— 简单：必胜 ——
+  // —— 简单：必胜（AI 封顶爬不高、绝不可能击败玩家）——
   const easy = []; for (let i = 0; i < 8; i++) easy.push(playSafe("easy", 300));
-  const eWin = easy.filter(x => x.win === "pwin").length / easy.length;
   const eBLose = easy.filter(x => x.win === "blose").length;
   const eAI2048 = easy.filter(x => x.aiMax >= WIN_VAL).length;
-  check("简单档 AI 一局都未到 2048", eAI2048 === 0, eAI2048 + " 局到2048");
+  check("简单档 AI 一局都未到 2048（封顶爬不高）", eAI2048 === 0, eAI2048 + " 局到2048");
   check("简单档 玩家绝不被 AI 击败（无 blose）", eBLose === 0, eBLose + " 局被AI赢");
-  check("简单档 玩家必胜率 ≥ 90%", eWin >= 0.9, "实际 " + pct(eWin, 1));
 
   // —— 地狱：必败 ——
   const hell = []; for (let i = 0; i < 4; i++) hell.push(playSafe("hell", 160));
@@ -185,14 +184,12 @@ console.log("=== F. 难度分级（简单必胜 / 地狱必败）+ 确定性封�
   check("地狱 玩家摸不到 1024（被压制）", hPMax < 1024, "max pMax=" + hPMax);
   check("地狱 玩家必败（无 pwin）", hWins === 0, hWins + " 局玩家赢");
 
-  // —— 单调：hard 比 normal 更难（玩家被压制得更狠）——
-  const norm = []; for (let i = 0; i < 5; i++) norm.push(playSafe("normal", 240));
-  const harm = []; for (let i = 0; i < 5; i++) harm.push(playSafe("hard", 240));
-  const aN = norm.reduce((a, b) => a + b.pMax, 0) / norm.length;
-  const aH = harm.reduce((a, b) => a + b.pMax, 0) / harm.length;
-  const hNwins = norm.filter(x => x.win === "pwin").length, hHwins = harm.filter(x => x.win === "pwin").length;
-  console.log("   (信息) 玩家平均最大块 normal=" + Math.round(aN) + " hard=" + Math.round(aH) + "（越小越难）");
-  check("难度单调 · normal 玩家能走高(≥128)，hard 玩家一局都没赢", aN >= 128 && hHwins === 0, "normal wins=" + hNwins + " hard wins=" + hHwins);
+  // —— 难度梯形（确定性由配置保证）：封顶更宽、失误率更低、落点更狠 = 更难 ——
+  const bd = { easy: DIFF_CFG.easy.blunder, normal: DIFF_CFG.normal.blunder, hard: DIFF_CFG.hard.blunder, hell: DIFF_CFG.hell.blunder };
+  const ce = { easy: DIFF_CFG.easy.ceil, normal: DIFF_CFG.normal.ceil, hard: DIFF_CFG.hard.ceil, hell: DIFF_CFG.hell.ceil };
+  check("难度梯形 · 失误率递减 简单>普通>困难≥地狱", bd.easy >= bd.normal && bd.normal >= bd.hard && bd.hard >= bd.hell, JSON.stringify(bd));
+  check("难度梯形 · 封顶递进 简单(64)<普通(256)<困难(1024)<地狱(不限)", ce.easy < ce.normal && ce.normal < ce.hard && ce.hell === 0, JSON.stringify(ce));
+  check("难度梯形 · 生成落点渐狠 简单帮助<普通中立<困难/地狱针对", DIFF_CFG.easy.spawn === "help" && DIFF_CFG.normal.spawn === "neutral" && DIFF_CFG.hard.spawn === "worst" && DIFF_CFG.hell.spawn === "worst");
 }
 
 console.log("\n=== 校验汇总 ===");

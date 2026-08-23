@@ -406,16 +406,16 @@
   var DIFF_TARGET = { easy: 0.90, normal: 0.60, hard: 0.30, hell: 0.01 };
   // 新增：controlSpawn(地狱接管玩家盘) / selfKnown(自盘已知) / timeMs / nodes(算力)
   var DIFF_CFG = {
-    easy:   { pow: 0.5,  blunder: 1.0,  aiStart: 2,  ceil: 8,   floor: 0,   depthFl: 3, winK: 1.7, loseK: 0.4, spawn: "help",    p4b: 0.10, p4p: 0.06, controlSpawn: false, selfKnown: false, timeMs: 25, nodes: 120 },
-    normal: { pow: 1.0,  blunder: 0.45, aiStart: 2,  ceil: 256, floor: 0,   depthFl: 4, winK: 1.0, loseK: 1.0, spawn: "neutral", p4b: 0.10, p4p: 0.14, controlSpawn: false, selfKnown: false, timeMs: 70, nodes: 500 },
-    hard:   { pow: 1.8,  blunder: 0.08, aiStart: 4,  ceil: 1024,floor: 0,   depthFl: 5, winK: 0.8, loseK: 1.3, spawn: "worst",  p4b: 0.10, p4p: 0.28, controlSpawn: false, selfKnown: false, timeMs: 250, nodes: 2600 },
-    hell:   { pow: 4.0,  blunder: 0.0,  aiStart: 4,  ceil: 0,   floor: 60000, depthFl: 8, winK: 0.2, loseK: 2.0, spawn: "worst", p4b: 0.14, p4p: 0.42, controlSpawn: true,  selfKnown: true,  timeMs: 1000, nodes: 30000 }
+    easy:   { pow: 0.5,  blunder: 0.8,  aiStart: 2,  ceil: 64,  floor: 0,   depthFl: 3, winK: 1.7, loseK: 0.4, spawn: "help",    p4b: 0.10, p4p: 0.06, controlSpawn: false, selfKnown: false, timeMs: 40,  nodes: 200 },
+    normal: { pow: 1.0,  blunder: 0.45, aiStart: 2,  ceil: 256, floor: 0,   depthFl: 4, winK: 1.0, loseK: 1.0, spawn: "neutral", p4b: 0.10, p4p: 0.14, controlSpawn: false, selfKnown: false, timeMs: 90,  nodes: 700 },
+    hard:   { pow: 1.8,  blunder: 0.08, aiStart: 4,  ceil: 1024,floor: 0,   depthFl: 5, winK: 0.8, loseK: 1.3, spawn: "worst",  p4b: 0.10, p4p: 0.30, controlSpawn: false, selfKnown: false, timeMs: 320, nodes: 3600 },
+    hell:   { pow: 4.0,  blunder: 0.0,  aiStart: 8,  ceil: 0,   floor: 60000, depthFl: 8, winK: 0.2, loseK: 2.0, spawn: "worst", p4b: 0.16, p4p: 0.50, controlSpawn: true,  selfKnown: true,  timeMs: 880, nodes: 50000 }
   };
   var DIFF_DESC = {
-    easy:   "AI 随机乱走出8即自灭 · 你随便划也必赢",
+    easy:   "AI 温和陪跑到 64 再认输 · 你必胜且玩得久",
     normal: "AI 随时能摸到 256，势均力敌",
     hard:   "AI 少失误 + 落点针对，逼近 1024 才止步",
-    hell:   "AI 接管你的生成 + 自盘可预知，MCTS 深搜提前带飞，玩家几乎必败"
+    hell:   "AI 接管你的生成 + 起手带 8 天胡，MCTS 深搜，玩家必败"
   };
 
   /* 情绪状态机（只调表达与预算上浮，绝不低于难度基线） */
@@ -505,7 +505,8 @@
       if (!ceil || maxVal(r2.board) <= ceil) opts.push(all[oi]);
     }
     if (!opts.length) return null;
-    var eff = Math.max(8, Math.round(timeMs * mult)); // 情绪只上浮，≥基线
+    // 单步思考硬上限：情绪放大后仍 ≤950ms，叠加调度开销也不超过 1 秒
+    var eff = Math.min(950, Math.max(8, Math.round(timeMs * mult)));
     var d = mctsBest(board, { timeMs: eff, nodes: nodes, spawn: known ? "known" : "random", p4: cfg.p4b });
     if (d === null || opts.indexOf(d) < 0) return opts[0];
     return d;
@@ -683,7 +684,7 @@
     this.controlSpawn = cfg.controlSpawn === true;
     this.timeMs = cfg.timeMs || 200;
     this.nodes = cfg.nodes || 1000;
-    this.hellMinGap = 2;  // 地狱对抗生成保留的最小空位（更狠但仍有活路）
+    this.hellMinGap = 1;  // 地狱对抗生成保留的最小空位（填得极狠但仍有活路）
 
     if (this.el.container && this.el.container.classList) this.el.container.classList.toggle("is-hell", this.hell);
     this.setStatus(this.hell ? "地狱开局 · AI 与你同起点" : "你的回合");
