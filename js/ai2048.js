@@ -231,6 +231,61 @@
     return true;
   }
 
+  /* ================= 地狱「猫腻」· 操控玩家盘生成 =================
+     开局看起来与普通档完全一样（中立随机 2/4），
+     但之后的每次“系统补子”，AI 都暗中把【落点 + 数值】都往对玩家
+     最不利的方向刁钻：三种伪装策略轮换，玩家只当是系统随机生成。
+       策略 A（精准落刀）：找"放 2/4/8 后玩家最优应对评分最低"的空位，落最狠。
+       策略 B（次恶伪装）：在前几个次痛空位里随机掷价值，看似随机实则针对性。
+       策略 C（完全伪装）：纯随机空位 + 标准 10% 出 4，彻底迷惑。
+      数值随盘面变紧而升级（空位少→更多 4/8），越后期越凶狠，但仍“像随机”。 */
+  function hellPlayerSpawn(b) {
+    var cells = emptyCells(b);
+    if (!cells.length) return false;
+    var e = cells.length;
+    function rollVal() {
+      var r = Math.random();
+      if (e <= 4)  return r < 0.22 ? 8 : (r < 0.62 ? 4 : 2); // 紧盘：喷 8
+      if (e <= 7)  return r < 0.08 ? 8 : (r < 0.45 ? 4 : 2); // 中压
+      return r < 0.35 ? 4 : 2;                                // 松盘：大致像普通
+    }
+    function harm(rc, v) {
+      var nb = clone(b); placeTile(nb, rc[0], rc[1], v);
+      var best = -Infinity;
+      for (var d = 0; d < 4; d++) { var s = playerBestAfter(nb, d); if (s > best) best = s; }
+      return best;
+    }
+    var cands = sampleCells(cells, Math.min(cells.length, 16));
+    var mode = Math.random();
+    if (mode < 0.55) {
+      // 策略 A：精准落刀（最痛点，微激励 4）
+      var worstCell = null, worstV = 2, wv = Infinity;
+      for (var i = 0; i < cands.length; i++)
+        for (var vi = 0; vi < 3; vi++) {
+          var v = vi === 0 ? 2 : (vi === 1 ? 4 : 8);
+          if (v === 8 && e > 6) continue;                 // 松盘不放 8，避免显眼
+          var h = harm(cands[i], v);
+          if (v === 4 && e >= 5) h -= 12;                 // 悄悄多用 4（更隐蔽更伤）
+          if (h < wv) { wv = h; worstCell = cands[i]; worstV = v; }
+        }
+      if (worstCell) placeTile(b, worstCell[0], worstCell[1], worstV);
+      return true;
+    }
+    if (mode < 0.85) {
+      // 策略 B：次恶伪装（前 K 个次痛空位里随机掷价值）
+      var ranked = [];
+      for (var rk = 0; rk < cands.length; rk++) ranked.push({ rc: cands[rk], h: harm(cands[rk], 2) });
+      ranked.sort(function (a, b) { return a.h - b.h; });
+      var pick = ranked[(Math.random() * Math.min(4, ranked.length)) | 0];
+      placeTile(b, pick.rc[0], pick.rc[1], rollVal());
+      return true;
+    }
+    // 策略 C：完全伪装（标准随机，迷惑玩家）
+    var p = cells[(Math.random() * cells.length) | 0];
+    placeTile(b, p[0], p[1], Math.random() < 0.1 ? 4 : 2);
+    return true;
+  }
+
   /* ================= MCTS 工厂（自包含，Worker 与主线程共用） =================
      设计成 `mctsFactory.toString()` 直接注入内联 Blob Worker，零重复、零依赖。 */
   function mctsFactory() {
@@ -409,13 +464,13 @@
     easy:   { pow: 0.5,  blunder: 0.8,  aiStart: 2,  ceil: 64,  floor: 0,   depthFl: 3, winK: 1.7, loseK: 0.4, spawn: "help",    p4b: 0.10, p4p: 0.06, controlSpawn: false, selfKnown: false, timeMs: 40,  nodes: 200 },
     normal: { pow: 1.0,  blunder: 0.45, aiStart: 2,  ceil: 256, floor: 0,   depthFl: 4, winK: 1.0, loseK: 1.0, spawn: "neutral", p4b: 0.10, p4p: 0.14, controlSpawn: false, selfKnown: false, timeMs: 90,  nodes: 700 },
     hard:   { pow: 1.8,  blunder: 0.08, aiStart: 4,  ceil: 1024,floor: 0,   depthFl: 5, winK: 0.8, loseK: 1.3, spawn: "worst",  p4b: 0.10, p4p: 0.30, controlSpawn: false, selfKnown: false, timeMs: 320, nodes: 3600 },
-    hell:   { pow: 4.0,  blunder: 0.0,  aiStart: 8,  ceil: 0,   floor: 60000, depthFl: 8, winK: 0.2, loseK: 2.0, spawn: "worst", p4b: 0.16, p4p: 0.50, controlSpawn: true,  selfKnown: true,  timeMs: 880, nodes: 50000 }
+    hell:   { pow: 4.0,  blunder: 0.0,  aiStart: 2,  ceil: 0,   floor: 60000, depthFl: 8, winK: 0.2, loseK: 2.0, spawn: "neutral", p4b: 0.16, p4p: 0.25, controlSpawn: true,  selfKnown: true,  timeMs: 880, nodes: 50000 }
   };
   var DIFF_DESC = {
     easy:   "AI 温和陪跑到 64 再认输 · 你必胜且玩得久",
     normal: "AI 随时能摸到 256，势均力敌",
     hard:   "AI 少失误 + 落点针对，逼近 1024 才止步",
-    hell:   "AI 接管你的生成 + 起手带 8 天胡，MCTS 深搜，玩家必败"
+    hell:   "看似公平开局 · 实则 AI 暗中操控你棋盘的落子与数字，必败"
   };
 
   /* 情绪状态机（只调表达与预算上浮，绝不低于难度基线） */
@@ -1032,8 +1087,8 @@
     var sc = slideTrack(old, dir);
     this.ps += res.gained; this.pMerges += res.gained;
     var gained = res.gained, mergesNo = res.merges;
-    // 玩家盘补子：地狱对抗；否则按难度
-    if (this.controlSpawn) spawnWorst(this.p, this.hellMinGap);
+    // 玩家盘补子：地狱用「操控生成」（落点+数值都做手脚）；否则常规
+    if (this.controlSpawn) hellPlayerSpawn(this.p);
     else if (this.playerSpawn === "worst") spawnWorst(this.p, this.hellMinGap);
     else if (this.playerSpawn === "help") spawnHelp(this.p);
     else spawn(this.p, this.p4p);
@@ -1216,7 +1271,7 @@
       DIFF_CFG: DIFF_CFG, DIFF_TARGET: DIFF_TARGET,
       emptyBoard: emptyBoard, clone: clone, emptyCells: emptyCells,
       tryMove: tryMove, spawn: spawn, placeTile: placeTile, addTileEmpty: addTileEmpty,
-      spawnWorst: spawnWorst, spawnHelp: spawnHelp, maxVal: maxVal, deadOr: deadOr, decideWinner: decideWinner,
+      spawnWorst: spawnWorst, spawnHelp: spawnHelp, hellPlayerSpawn: hellPlayerSpawn, maxVal: maxVal, deadOr: deadOr, decideWinner: decideWinner,
       heuristic: heuristic, mulberry32: mulberry32, hellOwnSpawn: hellOwnSpawn,
       mctsBest: mctsBest, chooseBotMove: chooseBotMove, mctsFactory: mctsFactory,
       scoreToBudget: scoreToBudget, eloGap: eloGap, depthCap: depthCap,

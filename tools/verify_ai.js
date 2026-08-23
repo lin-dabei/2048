@@ -12,7 +12,7 @@ const A = require("../js/ai2048.js");
 const {
   WIN_VAL, DIFF_CFG, DIFF_TARGET,
   emptyBoard, clone, emptyCells, tryMove,
-  spawn, placeTile, addTileEmpty, spawnWorst, spawnHelp,
+  spawn, placeTile, addTileEmpty, spawnWorst, spawnHelp, hellPlayerSpawn,
   maxVal, deadOr, decideWinner,
   heuristic, hellOwnSpawn, mctsBest, chooseBotMove,
   EMOTIONS, EMOTION_ORDER
@@ -108,6 +108,17 @@ console.log("=== C. 地狱可控性 ===");
   placeTile(crowd, 3,0,32); placeTile(crowd, 3,1,64); placeTile(crowd, 3,2,128); // 只剩 1 空位
   spawnWorst(crowd, 3); // minGap 3：当前空位 1 <= 3 → 不填
   check("对抗放置不降到最小间隙以下", emptyCells(crowd).length >= 1, "empties=" + emptyCells(crowd).length);
+  // 地狱「猫腻」：开局看起来一样（中立落点 + 无起手高位），暗中操控生成
+  check("地狱 开局看起来一样（中立生成 + 无起手高位块）", DIFF_CFG.hell.spawn === "neutral" && DIFF_CFG.hell.aiStart === 2, JSON.stringify({ spawn: DIFF_CFG.hell.spawn, aiStart: DIFF_CFG.hell.aiStart }));
+  {
+    const hs = emptyBoard(); spawn(hs); spawn(hs);
+    const before = emptyCells(hs).length;
+    hellPlayerSpawn(hs);
+    const after = emptyCells(hs);
+    const placed = before - after.length === 1;
+    const val = (() => { for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if ([2,4,8].includes(hs[r][c])) { return hs[r][c]; } return 0; })();
+    check("地狱 操控生成确实落一个 2/4/8", placed && [2,4,8].includes(val), "before=" + before + " after=" + after.length + " val=" + val);
+  }
   // MCTS 在可玩盘上有合法走子；死盘返回 null
   const pB = emptyBoard(); spawn(pB); spawn(pB); spawn(pB);
   const dm = mctsBest(pB, { timeMs: 20, nodes: 200, spawn: "random", p4: 0.1 });
@@ -157,7 +168,10 @@ console.log("=== F. 难度分级（简单必胜 / 地狱必败）+ 确定性封�
       if (deadOr(p)) { win = "plose"; break; }
       const d = greedy(p); if (d < 0) { win = "plose"; break; }
       const pr = tryMove(p, d); if (pr.moved) p = pr.board;
-      if (cfg.spawn === "worst") spawnWorst(p, 2); else if (cfg.spawn === "help") spawnHelp(p); else spawn(p, cfg.p4p);
+      if (cfg.controlSpawn) hellPlayerSpawn(p);
+      else if (cfg.spawn === "worst") spawnWorst(p, 2);
+      else if (cfg.spawn === "help") spawnHelp(p);
+      else spawn(p, cfg.p4p);
       st++; pMax = maxVal(p); if (pMax >= WIN_VAL) { win = "pwin"; break; }
       if (deadOr(b)) { win = "pwin"; break; }
       const d2 = chooseBotMove(b, { timeMs: 35, nodes: 700, selfKnown: cfg.selfKnown, p4b: cfg.p4b, blunder: cfg.blunder, ceil: cfg.ceil || 0, mult: 1 });
@@ -189,7 +203,7 @@ console.log("=== F. 难度分级（简单必胜 / 地狱必败）+ 确定性封�
   const ce = { easy: DIFF_CFG.easy.ceil, normal: DIFF_CFG.normal.ceil, hard: DIFF_CFG.hard.ceil, hell: DIFF_CFG.hell.ceil };
   check("难度梯形 · 失误率递减 简单>普通>困难≥地狱", bd.easy >= bd.normal && bd.normal >= bd.hard && bd.hard >= bd.hell, JSON.stringify(bd));
   check("难度梯形 · 封顶递进 简单(64)<普通(256)<困难(1024)<地狱(不限)", ce.easy < ce.normal && ce.normal < ce.hard && ce.hell === 0, JSON.stringify(ce));
-  check("难度梯形 · 生成落点渐狠 简单帮助<普通中立<困难/地狱针对", DIFF_CFG.easy.spawn === "help" && DIFF_CFG.normal.spawn === "neutral" && DIFF_CFG.hard.spawn === "worst" && DIFF_CFG.hell.spawn === "worst");
+  check("难度梯形 · 生成落点渐狠 简单帮助<普通中立<困难针对/地狱暗控", DIFF_CFG.easy.spawn === "help" && DIFF_CFG.normal.spawn === "neutral" && DIFF_CFG.hard.spawn === "worst" && DIFF_CFG.hell.controlSpawn === true);
 }
 
 console.log("\n=== 校验汇总 ===");
