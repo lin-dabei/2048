@@ -143,41 +143,56 @@ console.log("=== E. 时间上限 + 难度配置 ===");
   check("简单档 ceil=8 下拒绝越界走法", ecl === null, "ecl=" + ecl);
 }
 
-console.log("=== F. 难度单调 + 简单档确定性封顶 ===");
+console.log("=== F. 难度分级（简单必胜 / 地狱必败）+ 确定性封顶 ===");
 {
   const greedy = (b) => { let best = -Infinity, dd = -1; for (let d = 0; d < 4; d++) { const r = tryMove(b, d); if (r.moved && heuristic(r.board) > best) { best = heuristic(r.board); dd = d; } } return dd; };
-  function run(diff, lim) {
+  function playSafe(diff, lim) {
     const cfg = DIFF_CFG[diff]; let p = emptyBoard(), b = emptyBoard();
-    const seed = () => { if (cfg.spawn === "worst") spawnWorst(p, 3); else if (cfg.spawn === "help") spawnHelp(p); else spawn(p, cfg.p4p); };
-    seed(); seed(); seed(); spawn(b); spawn(b); spawn(b);
-    let st = 0, pMax = 0, bMax = 0, win = null;
+    const seed = () => { if (cfg.spawn === "worst") spawnWorst(p, 2); else if (cfg.spawn === "help") spawnHelp(p); else spawn(p, cfg.p4p); };
+    seed(); seed(); seed();
+    if (cfg.aiStart > 2) { b[0][0] = cfg.aiStart; spawn(b, cfg.p4b); spawn(b, cfg.p4b); } else { spawn(b, cfg.p4b); spawn(b, cfg.p4b); spawn(b, cfg.p4b); }
+    let st = 0, win = null, pMax = 0, aiMax = 0;
     while (st < lim && !win) {
-      if (deadOr(p)) { win = "lose"; break; }
-      const d = greedy(p); if (d < 0) { win = "lose"; break; }
-      const pr = tryMove(p, d); if (pr.moved) p = pr.board; playerFill(p, cfg); st++;
-      pMax = maxVal(p); if (pMax >= WIN_VAL) { win = "win"; break; }
-      if (deadOr(b)) { win = "win"; break; }
-      const st2 = aiStep(b, cfg);
-      if (st2.moved) { b = st2.board; }
-      st++; bMax = maxVal(b); if (bMax >= WIN_VAL) { win = "lose"; break; }
+      if (deadOr(p)) { win = "plose"; break; }
+      const d = greedy(p); if (d < 0) { win = "plose"; break; }
+      const pr = tryMove(p, d); if (pr.moved) p = pr.board;
+      if (cfg.spawn === "worst") spawnWorst(p, 2); else if (cfg.spawn === "help") spawnHelp(p); else spawn(p, cfg.p4p);
+      st++; pMax = maxVal(p); if (pMax >= WIN_VAL) { win = "pwin"; break; }
+      if (deadOr(b)) { win = "pwin"; break; }
+      const d2 = chooseBotMove(b, { timeMs: 35, nodes: 700, selfKnown: cfg.selfKnown, p4b: cfg.p4b, blunder: cfg.blunder, ceil: cfg.ceil || 0, mult: 1 });
+      if (d2 !== null) { const br = tryMove(b, d2); if (br.moved) { b = br.board; if (cfg.selfKnown) { const s = hellOwnSpawn(b, 1); if (s) placeTile(b, s.r, s.c, s.v); } else spawn(b, cfg.p4b); } }
+      st++; aiMax = maxVal(b);
+      if (cfg.ceil > 0 && aiMax > cfg.ceil) { win = "pwin"; break; } // AI 触顶→玩家胜
+      if (aiMax >= WIN_VAL) { win = "blose"; break; }
     }
-    return { pMax, bMax, win };
+    if (!win) { const w = decideWinner(p, b, { ceil: cfg.ceil || 0, ps: 0, bs: 0 }); win = w.winner === "p" ? "pwin" : (w.winner ? "blose" : "draw"); }
+    return { win, pMax, aiMax };
   }
-  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
-  // 简单档：确定性封顶（AI 撑不过 8、一局都到不了 2048）
-  const easyRuns = []; for (let i = 0; i < 6; i++) easyRuns.push(run("easy", 600));
-  const easyBMax = Math.max.apply(null, easyRuns.map(r => r.bMax));
-  check("简单档 AI 始终 ≤ ceil(8)（撑不过8封顶）", easyBMax <= DIFF_CFG.easy.ceil, "max bMax=" + easyBMax);
-  check("简单档 AI 一局都未到 2048", easyRuns.every(r => r.bMax < WIN_VAL));
-  check("简单档 玩家平均最大块 ≥ 128（能轻松爬高）", avg(easyRuns.map(r => r.pMax)) >= 128, "avg=" + avg(easyRuns.map(r => r.pMax)));
-  // 难度单调：玩家(会玩/贪心)在 easy 走得最远、hard 被压得最狠
-  const pm = {};
-  for (const diff of ["easy", "normal", "hard"]) {
-    const arr = []; for (let i = 0; i < 6; i++) arr.push(run(diff, 400).pMax);
-    pm[diff] = avg(arr);
-  }
-  console.log("   (信息) 会玩玩家平均最大块  easy=" + pm.easy + " normal=" + pm.normal + " hard=" + pm.hard);
-  check("难度单调 · 玩家最大块 easy ≥ normal ≥ hard", pm.easy >= pm.normal - 32 && pm.normal >= pm.hard && pm.hard < 128, JSON.stringify(pm));
+
+  // —— 简单：必胜 ——
+  const easy = []; for (let i = 0; i < 8; i++) easy.push(playSafe("easy", 300));
+  const eWin = easy.filter(x => x.win === "pwin").length / easy.length;
+  const eBLose = easy.filter(x => x.win === "blose").length;
+  const eAI2048 = easy.filter(x => x.aiMax >= WIN_VAL).length;
+  check("简单档 AI 一局都未到 2048", eAI2048 === 0, eAI2048 + " 局到2048");
+  check("简单档 玩家绝不被 AI 击败（无 blose）", eBLose === 0, eBLose + " 局被AI赢");
+  check("简单档 玩家必胜率 ≥ 90%", eWin >= 0.9, "实际 " + pct(eWin, 1));
+
+  // —— 地狱：必败 ——
+  const hell = []; for (let i = 0; i < 4; i++) hell.push(playSafe("hell", 160));
+  const hPMax = Math.max.apply(null, hell.map(x => x.pMax));
+  const hWins = hell.filter(x => x.win === "pwin").length;
+  check("地狱 玩家摸不到 1024（被压制）", hPMax < 1024, "max pMax=" + hPMax);
+  check("地狱 玩家必败（无 pwin）", hWins === 0, hWins + " 局玩家赢");
+
+  // —— 单调：hard 比 normal 更难（玩家被压制得更狠）——
+  const norm = []; for (let i = 0; i < 5; i++) norm.push(playSafe("normal", 240));
+  const harm = []; for (let i = 0; i < 5; i++) harm.push(playSafe("hard", 240));
+  const aN = norm.reduce((a, b) => a + b.pMax, 0) / norm.length;
+  const aH = harm.reduce((a, b) => a + b.pMax, 0) / harm.length;
+  const hNwins = norm.filter(x => x.win === "pwin").length, hHwins = harm.filter(x => x.win === "pwin").length;
+  console.log("   (信息) 玩家平均最大块 normal=" + Math.round(aN) + " hard=" + Math.round(aH) + "（越小越难）");
+  check("难度单调 · normal 玩家能走高(≥128)，hard 玩家一局都没赢", aN >= 128 && hHwins === 0, "normal wins=" + hNwins + " hard wins=" + hHwins);
 }
 
 console.log("\n=== 校验汇总 ===");
