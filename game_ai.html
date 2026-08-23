@@ -34,6 +34,15 @@
       </div>
     </div>
 
+    <div class="winbar">
+      <span class="winbar-tag you">你</span>
+      <div class="winbar-track"><div class="winbar-fill" id="winbar-fill"></div></div>
+      <span class="winbar-pct" id="winpct">50%</span>
+      <span class="winbar-tag bot">AI</span>
+    </div>
+
+    <div class="ai-bubble" id="ai-bubble"></div>
+
     <div class="arena">
       <section class="side you">
         <div class="side-head">
@@ -63,6 +72,17 @@
       </section>
     </div>
 
+    <div class="sabot-bar">
+      <p class="sabot-title"><span>捣乱技能点</span> <b id="sabot-pts">×0</b></p>
+      <div class="sabot-controls">
+        <button type="button" class="diff-btn" id="sabot-btn" disabled>捣乱 ×0</button>
+        <button type="button" class="diff-btn" id="sabot-auto">自动插桩</button>
+        <button type="button" class="diff-btn" id="sabot-val">放 2</button>
+        <button type="button" class="diff-btn" id="sabot-cancel">取消</button>
+      </div>
+      <p class="sabot-hint" id="sabot-hint">每完成一轮各 +1 点 · 攒 1 点可主动在 AI 盘放一个 2/4（可跳过）</p>
+    </div>
+
     <div class="banner" id="banner">
       <span class="banner-text" id="banner-text"></span>
       <button class="btn btn-primary" id="replay">再战一局</button>
@@ -74,7 +94,7 @@
 
     <div id="settings-slot" class="diff-slot"></div>
 
-    <p class="game-note">你走一步，机器人想一步（深度前瞻）后走一步 —— <b>严格轮流</b>。<b>难度带确定性封顶</b>：简单档 AI 被钉死在 ≤8、随便划也大比分赢；普通撑到 256；困难逼近 1024；地狱你是 <b>负反馈拉满</b> —— 玩家盘落点刁钻，且 AI 与你<b>同起点</b>、零失误深搜步步紧逼高位，几乎让你无从反超。隐藏分动态调节灵敏度但不再能削弱地狱。</p>
+    <p class="game-note">你走一步，机器人想一步（MCTS 深搜）后走一步——<b>严格轮流</b>。<b>捣乱技能点</b>：每完成一轮双方各 +1 点，攒 1 点可自愿在对方盘放一个 2/4。<b>地狱</b>：AI 接管你的生成落点 + 自盘可预知，MCTS 深搜步步紧逼。<button type="button" class="diff-btn" id="feed-toggle">反馈开</button></p>
 
   </div>
 
