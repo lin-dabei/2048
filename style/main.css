@@ -335,5 +335,10 @@ body.mode-daily .daily-hud { display: flex; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { -webkit-animation-duration: 0.001ms !important; animation-duration: 0.001ms !important; -webkit-transition-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  /* 尊重“减弱动态”偏好：仅缩短装饰性动画，保留瓦片移动/合体等核心反馈 */
+  .heading, .hud-extras, .mode-selector, .timer-container, .above-game,
+  .restart-button, .undo-button, .daily-hud, .game-message {
+    -webkit-animation-duration: 0.001ms !important; animation-duration: 0.001ms !important;
+    -webkit-transition-duration: 0.001ms !important; transition-duration: 0.001ms !important;
+  }
 }

@@ -227,5 +227,12 @@ a:focus-visible, button:focus-visible {
 .rise-in.d3 { animation-delay: 0.18s; }
 
 @media (prefers-reduced-motion: reduce) {
-  * { -webkit-animation-duration: 0.001ms !important; animation-duration: 0.001ms !important; -webkit-transition-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  /* 尊重系统“减弱动态”偏好：仅缩短装饰性入场/悬停动画，
+     保留棋盘瓦片的移动/合体等核心游戏反馈动画。
+     此前 * 全局杀灭会让 PC（开启该选项时）失去全部游戏动画。 */
+  .rise-in, .cli-msg, .cli-howto-card, .cli-bar, .cli-title, .cli-sub,
+  .back-link, .btn, .diff-btn, .hud-chip, .heading, .callout, .telemetry {
+    -webkit-animation-duration: 0.001ms !important; animation-duration: 0.001ms !important;
+    -webkit-transition-duration: 0.001ms !important; transition-duration: 0.001ms !important;
+  }
 }

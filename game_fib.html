@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>2048＋ · 斐波那契</title>
+  <link rel="shortcut icon" href="favicon.ico">
+  <link href="style/ui.css" rel="stylesheet" type="text/css">
+  <link href="style/fib.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+  <div class="console">
+    <header class="cli-bar">
+      <a class="back-link" href="index.html">← 返回</a>
+      <span class="cli-sys">MODE.2048 // FIBO</span>
+    </header>
+
+    <header class="callout">
+      <h1 class="tag">斐波那契<span class="cn">FIBO</span></h1>
+      <p class="lede">数字不是 2 的幂，而是<b>斐波那契数列</b>：首尾相接的两枚才能合体 —— <b>1+1→2</b>、<b>1+2→3</b>、<b>2+3→5</b>、<b>3+5→8</b>……</p>
+    </header>
+
+    <div class="telemetry">
+      <div class="gauge"><span class="gauge-label">得分</span><span class="gauge-num" id="fb-score">0</span></div>
+      <div class="gauge"><span class="gauge-label">最佳</span><span class="gauge-num" id="fb-best">0</span></div>
+    </div>
+
+    <div class="board" id="board-fb"></div>
+
+    <div class="msg" id="fb-msg"></div>
+
+    <div id="settings-slot" class="diff-slot"></div>
+
+    <p class="manual">
+      方向键 / <b>WASD</b> 滑动 · 手机上直接<b>滑动</b><br>
+      <span class="fine">出生只有 <b>1</b> 与 <b>2</b>；只有「相邻斐波那契数」（或 1 与 1）相遇才合成它们的<b>和</b></span><br>
+      <span class="fine">目标：合成 <b>2048</b>（越过它的第一个斐波那契数为 2584）</span>
+    </p>
+  </div>
+
+  <script src="js/swipe.js"></script>
+  <script src="js/sfx.js"></script>
+  <script src="js/fib2048.js"></script>
+  <script>
+    window.FiboGame && new window.FiboGame(document.getElementById("board-fb"));
+    window.Sound && Sound.mount('settings-slot', { label: '音效' });
+  </script>
+</body>
+</html>
