@@ -21,14 +21,15 @@
     { q: 1,  r: -1 }   // NE
   ];
 
-  // Key -> direction index (6 directions). Arrows + WASD / C / Z / Q.
+  // Key -> direction index (6 directions). Arrows + WASD / Q E (↔ C Z).
+  // 对偶关系：Q↔C（NE）、E↔Z（SW），与页面提示一致。
   var KEYS = {
     ArrowRight: 0, KeyD: 0,
     ArrowDown:  1, KeyS: 1,
-    KeyC: 2,      KeyZ: 2,
+    KeyE: 2,  KeyZ: 2,
     ArrowLeft: 3, KeyA: 3,
     ArrowUp:   4, KeyW: 4,
-    KeyQ: 5
+    KeyQ: 5,  KeyC: 5
   };
 
   function inRange(q, r) {
@@ -149,18 +150,21 @@
 
   HexGame.prototype.bindInput = function () {
     var self = this;
+    // 六边方向 → 用于视觉推力的四向
+    var NUDGE_DIR = { 0: 1, 1: 2, 2: 2, 3: 3, 4: 0, 5: 0 };
+
     window.addEventListener("keydown", function (e) {
       var idx = KEYS[e.code];
       if (idx === undefined) return;
       e.preventDefault();
       this.move(DIRS[idx]);
+      // PC 键盘同样给棋盘推力回弹，避免“只有手机有动画”
+      if (window.nudge) window.nudge(this.container, NUDGE_DIR[idx]);
     }.bind(this));
 
     // 手机八向滑动：含对角线，映射到六边网格的全部六个方向
     // 右=E(0) 右下=SE(1) 下≈SE(1) 左下=SW(2) 左=W(3) 左上=NW(4) 上≈NW(4) 右上=NE(5)
     var SWIPE8_TO = { 1: 0, 5: 1, 2: 1, 6: 2, 3: 3, 7: 4, 0: 4, 4: 5 };
-    // 六边方向 → 用于视觉推力的四向
-    var NUDGE_DIR = { 0: 1, 1: 2, 2: 2, 3: 3, 4: 0, 5: 0 };
     if (window.bindSwipe8) {
       window.bindSwipe8(this.container, function (code) {
         var idx = SWIPE8_TO[code];

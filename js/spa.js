@@ -16,7 +16,8 @@
     hex:     { label: '六边模式', url: 'game_hex.html' },
     ai:      { label: '对抗模式', url: 'game_ai.html' },
     quantum: { label: '量子模式', url: 'game_quantum.html' },
-    dive:    { label: '整除模式', url: 'game_dive.html' }
+    dive:    { label: '整除模式', url: 'game_dive.html' },
+    fib:     { label: '斐波那契模式', url: 'game_fib.html' }
   };
 
   // ---------- 状态 ----------
