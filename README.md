@@ -4,7 +4,8 @@
 
 ## 在线阅读
 
-部署在 GitHub Pages：**https://2048.xns.asia**（记忆技巧：我是亚洲的2048小能手）
+部署在 GitHub Pages：**https://2048.xns.asia**
+（记忆技巧：我是亚洲的2048小能手）
 
 ## 七种玩法
 
