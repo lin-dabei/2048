@@ -80,6 +80,9 @@ KeyboardInputManager.prototype.listen = function () {
   this.bindButtonPress(".keep-playing-button", this.keepPlaying);
   this.bindButtonPress(".undo-button", this.undo);
 
+  // PC 鼠标拖拽滑动
+  this.bindMouseDrag();
+
   // Respond to swipe events
   var touchStartClientX, touchStartClientY;
   var gameContainer = document.getElementsByClassName("game-container")[0];
@@ -151,6 +154,44 @@ KeyboardInputManager.prototype.undo = function (event) {
 
 KeyboardInputManager.prototype.bindButtonPress = function (selector, fn) {
   var button = document.querySelector(selector);
-  button.addEventListener("click", fn.bind(this));
-  button.addEventListener(this.eventTouchend, fn.bind(this));
+  var self = this;
+  button.addEventListener("click", function (e) {
+    fn.call(self, e);
+    // 点击后立即失焦，避免按空格/回车再次误触该按钮
+    if (e.currentTarget) e.currentTarget.blur();
+  });
+  button.addEventListener(this.eventTouchend, function (e) {
+    fn.call(self, e);
+    if (e.currentTarget) e.currentTarget.blur();
+  });
+};
+
+// PC 鼠标拖拽：按住棋盘拖动即可滑动（与手机滑动手势等效）
+KeyboardInputManager.prototype.bindMouseDrag = function () {
+  var gameContainer = document.getElementsByClassName("game-container")[0];
+  if (!gameContainer || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) return;
+
+  var startX = null, startY = null, dragging = false;
+
+  gameContainer.addEventListener("mousedown", function (event) {
+    if (event.button !== 0) return;
+    startX = event.clientX;
+    startY = event.clientY;
+    dragging = true;
+  });
+
+  document.addEventListener("mousemove", function (event) {
+    if (!dragging) return;
+    var dx = event.clientX - startX;
+    var dy = event.clientY - startY;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 10) {
+      dragging = false;
+      this.emit("move", Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0));
+    }
+  }.bind(this));
+
+  document.addEventListener("mouseup", function () {
+    dragging = false;
+    startX = null; startY = null;
+  });
 };
