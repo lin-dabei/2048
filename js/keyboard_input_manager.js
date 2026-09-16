@@ -55,6 +55,9 @@ KeyboardInputManager.prototype.listen = function () {
                     event.shiftKey;
     var mapped    = map[event.which];
 
+    // 按住不放不再连发：一次按键只触发一步，避免棋盘像刷新一样狂闪
+    if (event.repeat) return;
+
     if (!modifiers) {
       if (mapped !== undefined) {
         event.preventDefault();
@@ -175,6 +178,7 @@ KeyboardInputManager.prototype.bindMouseDrag = function () {
 
   gameContainer.addEventListener("mousedown", function (event) {
     if (event.button !== 0) return;
+    event.preventDefault(); // 防止拖拽时选中文字 / 触发原生图片拖拽
     startX = event.clientX;
     startY = event.clientY;
     dragging = true;
@@ -184,7 +188,8 @@ KeyboardInputManager.prototype.bindMouseDrag = function () {
     if (!dragging) return;
     var dx = event.clientX - startX;
     var dy = event.clientY - startY;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) > 10) {
+    // 阈值放宽到 20px：轻微抖动不再触发移动，一次手势只滑一步
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 20) {
       dragging = false;
       this.emit("move", Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0));
     }

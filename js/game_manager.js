@@ -28,6 +28,9 @@ function GameManager(size, InputManager, Actuator, StorageManager) {
   this.fissionChance  = 0.30;          // 裂变模式：单块分裂概率
   this.fuseLife       = 8;             // 炸弹模式：瓦片基础寿命（步）
 
+  // 本次操作是否真实移动（true=需要重绘棋盘；false=无效滑动不刷新界面）
+  this._lastMoved = true;
+
   this.inputManager.on("move", this.move.bind(this));
   this.inputManager.on("restart", this.restart.bind(this));
   this.inputManager.on("keepPlaying", this.keepPlaying.bind(this));
@@ -67,6 +70,7 @@ GameManager.prototype.startNewGame = function (mode) {
   this.lastSpawn  = null;
   this.lastSpawnTile = null;
   this.lastExplosions = null;
+  this._lastMoved = true; // 开局/重开总是全量绘制
   this.rng = (this.mode === "daily") ? this.mulberry32(this.todaySeed()) : Math.random;
 
   this.storageManager.clearGameState();
@@ -227,6 +231,7 @@ GameManager.prototype.actuate = function () {
     canUndo:     !!this.undoStack,
     moves:       this.moves,
     stepsLeft:   this.stepsLeft,
+    moved:       this._lastMoved,
     fuseLife:    this.fuseLife,
     lastExplosions: this.lastExplosions,
     dailyBest:   (this.mode === "daily") ? this.recordDaily() : 0
@@ -281,6 +286,7 @@ GameManager.prototype.undo = function () {
   this.lastSpawn = null;
   this.lastSpawnTile = null;
   this.lastExplosions = null;
+  this._lastMoved = true; // 悔棋后棋盘已变，必须重绘
 
   this.actuate();
 };
@@ -436,6 +442,9 @@ GameManager.prototype.move = function (direction) {
     this.combo = 0;
     this.comboBonus = 0;
   }
+
+  // 记录本次是否有真实移动：无效滑动时跳过棋盘重绘，避免界面闪烁刷新
+  this._lastMoved = moved;
 
   // 统一收尾判定（无效果的一步也检查死局，障碍格可能造成"空位但无路可走"）
   if (this.mode === "n128" && this.maxTile() >= 128) {

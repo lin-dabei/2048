@@ -86,15 +86,21 @@ HTMLActuator.prototype.actuate = function (grid, metadata) {
   var self = this;
 
   window.requestAnimationFrame(function () {
-    self.clearContainer(self.tileContainer);
+    // 无效滑动（棋盘无变化）时跳过整个瓦片层的重建，界面不再闪烁刷新；
+    // 游戏结束/胜利/悔棋/新开局仍全量重绘
+    var repaint = metadata.moved || metadata.over || metadata.won;
 
-    grid.cells.forEach(function (column) {
-      column.forEach(function (cell) {
-        if (cell) {
-          self.addTile(cell);
-        }
+    if (repaint) {
+      self.clearContainer(self.tileContainer);
+
+      grid.cells.forEach(function (column) {
+        column.forEach(function (cell) {
+          if (cell) {
+            self.addTile(cell);
+          }
+        });
       });
-    });
+    }
 
     self.updateScore(metadata.score);
     self.updateBestScore(metadata.bestScore);
@@ -102,11 +108,11 @@ HTMLActuator.prototype.actuate = function (grid, metadata) {
     // 障碍格渲染
     self.updateBlocked(grid);
 
-    // 盲盒模式：数值藏起来，短暂揭示后盖回
-    if (metadata.mode === "blind") self.blindReveal();
+    // 盲盒模式：数值藏起来，短暂揭示后盖回（仅真实移动时闪现）
+    if (metadata.mode === "blind" && metadata.moved) self.blindReveal();
 
-    // 旋模式：每步旋转时给棋盘一个轻转动画
-    if (metadata.mode === "spin") self.spinFlash();
+    // 旋模式：每步旋转时给棋盘一个轻转动画（仅真实移动时摆动）
+    if (metadata.mode === "spin" && metadata.moved) self.spinFlash();
 
     // 炸模式：标记本步爆炸消失的格子（触发闪烁动画）
     if (metadata.lastExplosions && metadata.lastExplosions.length) {
